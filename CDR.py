@@ -12,6 +12,7 @@ from model.Model import Model
 from dataset.datareader import Datareader
 from dataset.Dataset import Dataset
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
 allResults = []
 
@@ -28,7 +29,7 @@ def main(dataName_A, dataName_B):
 	parser.add_argument('-maxEpochs',
 						action='store',
 						dest='maxEpochs',
-						default=100)
+						default=1)
 	parser.add_argument('-lr',
 						action='store',
 						dest='lr',
@@ -204,6 +205,33 @@ class trainer:
 			"Best HR: {}, NDCG: {} At Epoch {}".format(best_HR, best_NDCG, best_epoch))
 
 		bestPerformance = [[best_HR, best_NDCG, best_epoch]]
+		model.eval()
+		with torch.no_grad():
+			userVecs = [model(u, testItem[0])[0] for u in testUser]
+			itemVecs = [model(testUser[0], i)[1] for i in testItem]
+			userVecs = [i.detach().numpy().reshape(-1) for i in userVecs]
+			itemVecs = [i.detach().numpy().reshape(-1) for i in itemVecs]
+
+			tsne = TSNE(n_components=2, init='pca', random_state=0)
+			user2D = tsne.fit_transform(userVecs)
+			item2D = tsne.fit_transform(itemVecs)
+
+			# for idx, user in enumerate(testUser):
+			# 	user_out, item_out = model(testUser[idx], testItem[idx])
+			# 	userVecs.append(user_out)
+
+			fig0 = plt.figure()
+			t1 = plt.scatter(user2D[:, 0], user2D[:, 1], marker='x', c='r', s=20)  # marker:点符号 c:点颜色 s:点大小
+			t2 = plt.scatter(item2D[:, 0], item2D[:, 1], marker='o', c='b', s=20)
+			plt.xlabel('X')
+			plt.ylabel('Y')
+			plt.legend((t1, t2), ('user', 'item'))
+			plt.show()
+
+
+
+
+
 		matname = 'baseline_result.mat'
 		scio.savemat(matname, {
 						'allResults': allResults,
