@@ -11,7 +11,9 @@ import scipy.io as scio
 from model.Model import Model
 from dataset.datareader import Datareader
 from dataset.Dataset import Dataset
+import matplotlib.pyplot as plt
 
+allResults = []
 
 def main(dataName_A, dataName_B):
 	parser = argparse.ArgumentParser(description="Options")
@@ -26,7 +28,7 @@ def main(dataName_A, dataName_B):
 	parser.add_argument('-maxEpochs',
 						action='store',
 						dest='maxEpochs',
-						default=100)
+						default=10)
 	parser.add_argument('-lr',
 						action='store',
 						dest='lr',
@@ -78,9 +80,9 @@ class trainer:
 		self.output_dim = self.model_D2V.vector_size
 
 	def run(self):
+
 		model = Model(self.input_dim, self.output_dim, self.adj, self.model_D2V)
 		optimizer = optim.Adam(model.parameters(), lr=self.lr)
-		allResults = []
 		best_HR = -1
 		best_NDCG = -1
 		best_epoch = -1
@@ -185,8 +187,7 @@ class trainer:
 
 			HR = np.mean(HR)
 			NDCG = np.mean(NDCG)
-
-			allResults.append([epoch + 1, topK, HR, NDCG])
+			allResults.append([epoch + 1, topK, HR, NDCG, loss.detach().numpy()])
 			print(
 				"Epoch ", epoch + 1,
 				"TopK: {} HR: {}, NDCG: {}".format(
@@ -211,3 +212,17 @@ class trainer:
 
 if __name__ == '__main__':
 	main('Arts_Crafts_and_Sewing_5', 'Luxury_Beauty_5')
+	allResults = np.array(allResults)
+	x_label = allResults[:,0]
+	y_topK = allResults[:,1]
+	y_HR = allResults[:,2]
+	y_NDCG = allResults[:,3]
+	y_loss = allResults[:,4]
+
+	plt.plot(x_label, y_loss)
+	plt.xlabel('Epoch')
+	plt.ylabel('Loss')
+	plt.show()
+
+    # plt.plot()
+
