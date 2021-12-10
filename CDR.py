@@ -28,7 +28,7 @@ def main(dataName_A, dataName_B):
 	parser.add_argument('-maxEpochs',
 						action='store',
 						dest='maxEpochs',
-						default=10)
+						default=100)
 	parser.add_argument('-lr',
 						action='store',
 						dest='lr',
@@ -219,9 +219,33 @@ if __name__ == '__main__':
 	y_NDCG = allResults[:,3]
 	y_loss = allResults[:,4]
 
-	plt.plot(x_label, y_loss)
-	plt.xlabel('Epoch')
-	plt.ylabel('Loss')
+	fig1 = plt.figure()
+	f1 = fig1.add_subplot(1, 1, 1)
+	f1.set_title('Loss')
+	f1.set_xlabel('Epoch')
+	f1.set_ylabel('Loss')
+	f1.grid()
+	f1.plot(x_label, y_loss)
+	fig1.savefig('Loss.jpg')
+
+	fig2 = plt.figure()
+	f2 = fig2.add_subplot(1, 1, 1)
+	f2.set_title('HR')
+	f2.set_xlabel('Epoch')
+	f2.set_ylabel('HR')
+	f2.grid()
+	f2.plot(x_label, y_HR)
+	fig2.savefig('HR.jpg')
+
+	fig3 = plt.figure()
+	f3 = fig3.add_subplot(1, 1, 1)
+	f2.set_title('NDCG')
+	f3.set_xlabel('Epoch')
+	f3.set_ylabel('NDCG')
+	f3.grid()
+	f3.plot(x_label, y_NDCG)
+	fig3.savefig('NDCG.jpg')
+
 	plt.show()
 
     # plt.plot()
