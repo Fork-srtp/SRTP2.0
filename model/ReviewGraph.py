@@ -2,6 +2,7 @@ from model.datareader import Datareader
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 import math
+import numpy as np
 ca = []
 size = 3 # sliding windows size
 
@@ -155,6 +156,9 @@ if __name__ == '__main__':
     print(len(ca))
     # word2idx = {word: idx for word, idx in enumerate(cutwords3)}
 
-
+    A = np.ones([len(ca),len(ca)])
+    for i in range(len(ca)):
+        for j in range(len(ca)):
+            A[i][j] = getElement(i,j)
 
     a=2
