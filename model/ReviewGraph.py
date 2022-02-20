@@ -3,6 +3,7 @@ from nltk import word_tokenize
 from nltk.corpus import stopwords
 import math
 ca = []
+size = 3 # sliding windows size
 
 class elem:
     def __init__(self, t, c):
@@ -14,14 +15,38 @@ class elem:
     def __str__(self):
         return "type: {}, content: {}".format(self.type,self.content)
 
-def getPi(i:list):
-    pass
 
-def getPij(i:list,j:list):
-    pass
+def getPi(stringi:list):
+    w = len(ca) + 1 - size
+    w_i = 0
+    for i in range(0,len(ca)-size):
+        isI = False
+        for j in range(i,i+size):
+            if(ca[j].content == stringi):
+                isI = True
+        if isI:
+            w_i += 1
+    return w_i/w
 
-def getPMI(i:list,j:list):
-    res = math.log(getPij(i,j)/(getPi(i)*getPi(j)),10)
+
+def getPij(stringi:list,stringj:list):
+    w = len(ca) + 1 - size
+    w_ij  = 0
+    for i in range(0,len(ca)-size):
+        isI = False
+        isJ = False
+        for j in range(i,i+size):
+            if(ca[j].content == stringi):
+                isI = True
+            if(ca[j].content == stringj):
+                isJ = True
+        if(isI and isJ):
+            w_ij += 1
+    return w_ij/w
+
+
+def getPMI(stringi:list,stringj:list):
+    res = math.log(getPij(stringi,stringj)/(getPi(stringi)*getPi(stringj)),10)
     return res
 
 if __name__ == '__main__':
