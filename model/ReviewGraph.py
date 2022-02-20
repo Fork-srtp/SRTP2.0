@@ -30,8 +30,8 @@ def getElement(i,j):
         return 1
     elif ca[i].type == 1 and ca[j].type == 1:
         return getPMI(ca[i].content,ca[j].content)
-    elif ca[i].type == 1 and ca[j].type == 2:
-        pass
+    elif ca[i].type == 2 and ca[j].type == 1:
+        return TF_IDF(i,j)
     else:
         return 0
 
