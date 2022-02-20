@@ -15,6 +15,15 @@ class elem:
     def __str__(self):
         return "type: {}, content: {}".format(self.type,self.content)
 
+# 分词
+def getWords(doc:list):
+    cutwords1 = word_tokenize(doc)
+    interpunctuations = [',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%']  # 定义标点符号列表
+    cutwords2 = [word for word in cutwords1 if word not in interpunctuations]  # 去除标点符号
+    stops = set(stopwords.words("english"))
+    cutwords3 = [word for word in cutwords2 if word not in stops]
+    return cutwords3
+
 
 def getElement(i,j):
     if ca[i].content == ca[j].content:
@@ -27,32 +36,43 @@ def getElement(i,j):
         return 0
 
 def getPi(stringi:list):
-    w = len(ca) + 1 - size
+    w = 0
     w_i = 0
-    for i in range(0,len(ca)-size):
-        isI = False
-        for j in range(i,i+size):
-            if(ca[j].content == stringi):
-                isI = True
-        if isI:
-            w_i += 1
-    return w_i/w
+    for i in range(len(ca)):
+        if ca[i].type == 2:
+            w += 1
+    for i in range(len(ca)):
+        if ca[i].type == 2:
+            isI = False
+            cutwords = getWords(ca[i].content)
+            for j in cutwords:
+                if j == stringi:
+                    isI = True
+            if isI:
+                w_i += 1
+    return w_i / w
 
 
 def getPij(stringi:list,stringj:list):
-    w = len(ca) + 1 - size
-    w_ij  = 0
-    for i in range(0,len(ca)-size):
-        isI = False
-        isJ = False
-        for j in range(i,i+size):
-            if(ca[j].content == stringi):
-                isI = True
-            if(ca[j].content == stringj):
-                isJ = True
-        if(isI and isJ):
-            w_ij += 1
+    w = 0
+    w_ij = 0
+    for i in range(len(ca)):
+       if ca[i].type == 2:
+           w += 1
+    for i in range(len(ca)):
+        if ca[i].type == 2:
+            isI = False
+            isJ = False
+            cutwords = getWords(ca[i].content)
+            for j in cutwords:
+                if j == stringi:
+                    isI = True
+                if j == stringj:
+                    isJ = True
+            if isI and isJ:
+                w_ij += 1
     return w_ij/w
+
 
 
 def getPMI(stringi:list,stringj:list):
