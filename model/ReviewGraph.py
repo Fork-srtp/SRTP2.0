@@ -59,6 +59,34 @@ def getPMI(stringi:list,stringj:list):
     res = math.log(getPij(stringi,stringj)/(getPi(stringi)*getPi(stringj)),10)
     return res
 
+
+
+
+def TF_IDF(doc: int, word: int):
+    doc_str = ca[doc].content
+    word_str = ca[word].content
+    doc_list = word_tokenize(doc_str)
+    tf = doc_list.count(word_str) / len(doc_list)
+    idf = math.log(getCntByType(2) / (IDF_cnt(word_str) + 1), 10)
+    return tf * idf
+
+def getCntByType(type:int):
+    cnt = 0
+    for i in range(0,len(ca)):
+        if ca[i].type == type:
+            cnt += 1
+    return cnt
+
+
+def IDF_cnt(content:str):
+    cnt = 0
+    for i in range(0,len(ca)):
+        if ca[i].type == 2:
+            if content in ca[i].content:
+                cnt += 1
+    return cnt
+
+
 if __name__ == '__main__':
     dr = Datareader('Arts_Crafts_and_Sewing_5', 'Luxury_Beauty_5')
     A_user_rating_dict, A_user_review_dict, A_item_user_dict, \
