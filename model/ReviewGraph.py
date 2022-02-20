@@ -16,6 +16,16 @@ class elem:
         return "type: {}, content: {}".format(self.type,self.content)
 
 
+def getElement(i,j):
+    if ca[i].content == ca[j].content:
+        return 1
+    elif ca[i].type == 1 and ca[j].type == 1:
+        return getPMI(ca[i].content,ca[j].content)
+    elif ca[i].type == 1 and ca[j].type == 2:
+        pass
+    else:
+        return 0
+
 def getPi(stringi:list):
     w = len(ca) + 1 - size
     w_i = 0
