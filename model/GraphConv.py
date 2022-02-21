@@ -17,4 +17,3 @@ class GraphConv(nn.Module):
         out = F.relu(propagate)
 
         return out
-        

@@ -109,14 +109,30 @@ def IDF_cnt(content:str):
 
 
 if __name__ == '__main__':
+# def getGraph(name1:str,name2:str):
     dr = Datareader('Arts_Crafts_and_Sewing_5', 'Luxury_Beauty_5')
+    # dr = Datareader(name1,name2)
     A_user_rating_dict, A_user_review_dict, A_item_user_dict, \
         B_user_rating_dict, B_user_review_dict, B_item_user_dict = dr.read_data()
 
+    for user_name in B_user_review_dict:
+        # if A_user_review_dict.__contains(user_name):
+        if user_name in A_user_review_dict:
+            # print(A_user_review_dict[user_name])
+            # print(B_user_review_dict[user_name])
+            A_user_review_dict[user_name].extend(B_user_review_dict[user_name])
+        else:
+            A_user_review_dict[user_name] = B_user_review_dict[user_name]
 
+    for item_name in B_item_user_dict:
+        if item_name in A_item_user_dict:
+            A_item_user_dict[item_name].extend(B_item_user_dict)
+        else:
+            A_item_user_dict[item_name] = B_item_user_dict[item_name]
     full_review = ''
     # get 某一个user的所有review
     user_review ={}
+    A_user_review_dict.update()
     for user_name in A_user_review_dict:
         reviews = A_user_review_dict[user_name]
         review_cat = ''
@@ -139,6 +155,8 @@ if __name__ == '__main__':
         item_review[item_name] = review_cat
         full_review += review_cat
 
+
+
     cutwords1 = word_tokenize(full_review)
     interpunctuations = [',', '.', ':', ';', '?', '(', ')', '[', ']', '&', '!', '*', '@', '#', '$', '%']  # 定义标点符号列表
     cutwords2 = [word for word in cutwords1 if word not in interpunctuations]  # 去除标点符号
@@ -156,9 +174,10 @@ if __name__ == '__main__':
     print(len(ca))
     # word2idx = {word: idx for word, idx in enumerate(cutwords3)}
 
-    A = np.ones([len(ca),len(ca)])
+    A = np.ones([len(ca),len(ca)],np.float32)
     for i in range(len(ca)):
         for j in range(len(ca)):
             A[i][j] = getElement(i,j)
 
-    a=2
+    # a=2
+    # return A

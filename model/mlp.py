@@ -40,7 +40,7 @@ class MLP(nn.Module):
 
         x = self.fc5(x)
         x = self.relu5(x)
-        
+
         x = self.fc6(x)
         x = self.relu6(x)
         return x
