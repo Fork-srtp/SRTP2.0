@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from model.GraphConv import GraphConv
 
 
-class GCN(nn.Module):
+class ReviewGCN(nn.Module):
     def __init__(self, input_dim, output_dim, A):
         super().__init__()
 

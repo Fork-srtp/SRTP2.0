@@ -2,22 +2,27 @@ import torch
 import torch.nn as nn
 from model.GCN import GCN
 from model.mlp import MLP
+from model.ReviewGCN import ReviewGCN
 
 
 class Model(nn.Module):
-    def __init__(self, input_dim, output_dim, A_A, A_B):
+    def __init__(self, input_dim, output_dim, A_A, A_B, Review_A, Review_B):
         super().__init__()
 
         self.A_A = A_A
         self.A_B = A_B
 
         self.feature_idx_A = [i for i in range(A_A.shape[0])]
-        self.features_A = torch.from_numpy(self.A_A[self.feature_idx_A])
+        # self.features_A = torch.from_numpy(self.A_A[self.feature_idx_A])
+        self.features_A = self.A_A[self.feature_idx_A]
         self.GNN_A = GCN(input_dim, output_dim, A_A)
+        self.ReviewGCN_A = ReviewGCN(input_dim, output_dim, Review_A)
 
         self.feature_idx_B = [i for i in range(A_B.shape[0])]
-        self.features_B = torch.from_numpy(self.A_B[self.feature_idx_B])
+        # self.features_B = torch.from_numpy(self.A_B[self.feature_idx_B])
+        self.features_B = self.A_B[self.feature_idx_B]
         self.GNN_B = GCN(input_dim, output_dim, A_B)
+        self.ReviewGCN_B = ReviewGCN(input_dim, output_dim, Review_B)
 
         self.user_W_Attention_A_A = nn.Parameter(
             torch.randn(A_A.shape[0], input_dim),

@@ -13,6 +13,7 @@ from dataset.datareader import Datareader
 from dataset.Dataset import Dataset
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+from model.ReviewGraph import GraphBuilder
 
 allResults = []
 
@@ -47,6 +48,14 @@ def main(dataName_A, dataName_B):
                         action='store',
                         dest='negNum',
                         default=4)
+    parser.add_argument('-input_dim',
+                        action='store',
+                        dest='input_dim',
+                        default=10)
+    parser.add_argument('-output_dim',
+                        action='store',
+                        dest='output_dim',
+                        default=10)
     args = parser.parse_args()
 
     classifier = trainer(args)
@@ -63,30 +72,42 @@ class trainer:
         self.batchSize = args.batchSize
         self.lambdad = args.lambdad
         self.negNum = args.negNum
+        self.input_dim = args.input_dim
+        self.output_dim = args.output_dim
 
         dr = Datareader(self.dataName_A, self.dataName_B)
         A_user_rating_dict, A_user_review_dict, A_item_user_dict, \
         B_user_rating_dict, B_user_review_dict, B_item_user_dict \
             = dr.read_data()
 
-        self.dataset = Dataset(
+        self.dataset_A = Dataset(
             A_user_rating_dict, A_user_review_dict, A_item_user_dict)
         self.dataset_B = Dataset(
             B_user_rating_dict, B_user_review_dict, B_item_user_dict)
+        self.jj = GraphBuilder()
+        self.Review_A, self.Review_B = self.jj.getGraph(A_user_review_dict,
+                                                A_item_user_dict,
+                                                B_user_review_dict,
+                                                B_item_user_dict)
 
-        self.adj, self.model_D2V = self.dataset.adj, self.dataset.model_D2V
-        self.dataset.getTrainTest()
-        self.dataset.getTrainDict()
-        self.train, self.test = self.dataset.train, self.dataset.test
-        self.testNeg = self.dataset.getTestNeg(self.test, self.negNum)
+        self.adj_A = self.dataset_A.adj
+        self.dataset_A.getTrainTest()
+        self.dataset_A.getTrainDict()
+        self.train_A, self.test_A = self.dataset_A.train, self.dataset_A.test
+        self.testNeg_A = self.dataset_A.getTestNeg(self.test_A, self.negNum)
 
-        self.maxRate = self.dataset.maxRate
-        self.input_dim = self.model_D2V.vector_size
-        self.output_dim = self.model_D2V.vector_size
+        self.adj_B = self.dataset_B.adj
+        self.dataset_B.getTrainTest()
+        self.dataset_B.getTrainDict()
+        self.train_B, self.test_B = self.dataset_B.train, self.dataset_B.test
+        self.testNeg_B = self.dataset_B.getTestNeg(self.test_B, self.negNum)
+
+        self.maxRate_A = self.dataset_A.maxRate
+        self.maxRate_B = self.dataset_B.maxRate
 
     def run(self):
 
-        model = Model(self.input_dim, self.output_dim, self.adj, self.model_D2V)
+        model = Model(self.input_dim, self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         optimizer = optim.Adam(model.parameters(), lr=self.lr)
         best_HR = -1
         best_NDCG = -1
@@ -96,25 +117,76 @@ class trainer:
         topK = 4
         for epoch in range(self.maxEpochs):
             print("=" * 20 + "Epoch ", epoch + 1, "=" * 20)
-            train_u, train_i, train_r = self.dataset.getInstances(
-                self.train, self.negNum)
-            train_len = len(train_u)
-            shuffle_idx = np.random.permutation(np.arange(train_len))
-            train_u = train_u[shuffle_idx]
-            train_i = train_i[shuffle_idx]
-            train_r = train_r[shuffle_idx]
+            train_u_A, train_i_A, train_r_A = self.dataset_A.getInstances(
+                self.train_A, self.negNum)
+            train_len_A = len(train_u_A)
+            shuffle_idx = np.random.permutation(np.arange(train_len_A))
+            train_u_A = train_u_A[shuffle_idx]
+            train_i_A = train_i_A[shuffle_idx]
+            train_r_A = train_r_A[shuffle_idx]
 
-            num_batches = train_len // self.batchSize + 1
+            num_batches = train_len_A // self.batchSize + 1
 
-            loss = torch.zeros(0)
+            loss_A = torch.zeros(0)
             for i in range(num_batches):
                 min_idx = i * self.batchSize
-                max_idx = np.min([train_len, (i + 1) * self.batchSize])
+                max_idx = np.min([train_len_A, (i + 1) * self.batchSize])
 
-                if min_idx < train_len:
-                    train_u_batch = train_u[min_idx:max_idx]
-                    train_i_batch = train_i[min_idx:max_idx]
-                    train_r_batch = train_r[min_idx:max_idx]
+                if min_idx < train_len_A:
+                    train_u_batch = train_u_A[min_idx:max_idx]
+                    train_i_batch = train_i_A[min_idx:max_idx]
+                    train_r_batch = train_r_A[min_idx:max_idx]
+
+                    train_u_batch = torch.tensor(train_u_batch)
+                    train_i_batch = torch.tensor(train_i_batch)
+                    train_r_batch = torch.tensor(train_r_batch)
+
+                    user_out, item_out = model(train_u_batch, train_i_batch, 'A')
+
+                    norm_user_output = torch.sqrt(
+                        torch.sum(torch.square(user_out), axis=1))
+                    norm_item_output = torch.sqrt(
+                        torch.sum(torch.square(item_out), axis=1))
+                    regularizer = F.mse_loss(user_out, torch.zeros_like(user_out)) + F.mse_loss(
+                        item_out, torch.zeros_like(item_out))
+                    y_hat = torch.sum(
+                        torch.mul(user_out, item_out), axis=1
+                    ) / (norm_user_output * norm_item_output)
+                    y_hat = y_hat + (1e-6) * (y_hat < 1e-6)
+                    regRate = train_r_batch / self.maxRate_A
+                    batchLoss_A = -(regRate * torch.log(
+                        y_hat) + (1 - regRate) * torch.log(
+                        1 - y_hat)) + self.lambdad * regularizer
+
+                    optimizer.zero_grad()
+                    batchLoss_A.backward(train_u_batch)
+                    optimizer.step()
+
+                    loss_A = torch.cat((loss_A, batchLoss_A.view(1, -1)), dim=1)
+
+            loss_A = torch.mean(loss_A)
+            print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_A))
+
+            # domain B
+            train_u_B, train_i_B, train_r_B = self.dataset_B.getInstances(
+                self.train_B, self.negNum)
+            train_len_B = len(train_u_B)
+            shuffle_idx = np.random.permutation(np.arange(train_len_B))
+            train_u_B = train_u_B[shuffle_idx]
+            train_i_B = train_i_B[shuffle_idx]
+            train_r_B = train_r_B[shuffle_idx]
+
+            num_batches = train_len_B // self.batchSize + 1
+
+            loss_B = torch.zeros(0)
+            for i in range(num_batches):
+                min_idx = i * self.batchSize
+                max_idx = np.min([train_len_B, (i + 1) * self.batchSize])
+
+                if min_idx < train_len_B:
+                    train_u_batch = train_u_B[min_idx:max_idx]
+                    train_i_batch = train_i_B[min_idx:max_idx]
+                    train_r_batch = train_r_B[min_idx:max_idx]
 
                     train_u_batch = torch.tensor(train_u_batch)
                     train_i_batch = torch.tensor(train_i_batch)
@@ -132,26 +204,28 @@ class trainer:
                         torch.mul(user_out, item_out), axis=1
                     ) / (norm_user_output * norm_item_output)
                     y_hat = y_hat + (1e-6) * (y_hat < 1e-6)
-                    regRate = train_r_batch / self.maxRate
-                    batchLoss = -(regRate * torch.log(
+                    regRate = train_r_batch / self.maxRate_B
+                    batchLoss_B = -(regRate * torch.log(
                         y_hat) + (1 - regRate) * torch.log(
                         1 - y_hat)) + self.lambdad * regularizer
 
                     optimizer.zero_grad()
-                    batchLoss.backward(train_u_batch)
+                    batchLoss_B.backward(train_u_batch)
                     optimizer.step()
 
-                    loss = torch.cat((loss, batchLoss.view(1, -1)), dim=1)
+                    loss_B = torch.cat((loss_B, batchLoss_B.view(1, -1)), dim=1)
 
-            loss = torch.mean(loss)
-            print("\nMean Loss in epoch {} is: {}\n".format(epoch + 1, loss))
+            loss_B = torch.mean(loss_B)
+            print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_B))
+
+
 
             model.eval()
 
             HR = []
             NDCG = []
-            testUser = self.testNeg[0]
-            testItem = self.testNeg[1]
+            testUser = self.testNeg_A[0]
+            testItem = self.testNeg_A[1]
             for i in range(len(testUser)):
                 target = testItem[i][0]
                 user_out, item_out = model(testUser[i], testItem[i])
