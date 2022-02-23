@@ -21,9 +21,6 @@ class elem:
 
 # 分词
 
-
-
-
 class GraphBuilder:
     def __init__(self):
         self.window_size = 10  # sliding windows size

@@ -14,7 +14,7 @@ from dataset.Dataset import Dataset
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
-
+from model.ReviewGraphBuilder import BuildGraph
 allResults = []
 
 
@@ -84,7 +84,8 @@ class trainer:
             A_user_rating_dict, A_user_review_dict, A_item_user_dict)
         self.dataset_B = Dataset(
             B_user_rating_dict, B_user_review_dict, B_item_user_dict)
-        self.jj = GraphBuilder()
+        # self.jj = GraphBuilder()
+        self.jj = BuildGraph()
         self.Review_A, self.Review_B = self.jj.getGraph(A_user_review_dict,
                                                 A_item_user_dict,
                                                 B_user_review_dict,
