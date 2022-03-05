@@ -8,7 +8,7 @@ class GraphConv(nn.Module):
 
         self.dropout = dropout
         self.pre = pre
-        self.weight = nn.Parameter(torch.randn(pre.shape[0], output_dim), requires_grad=True)
+        self.weight = nn.Parameter(torch.randn(input_dim, output_dim), requires_grad=True)
         self.bias = nn.Parameter(torch.zeros(output_dim), requires_grad=True)
 
     def forward(self, features):

@@ -6,52 +6,57 @@ from model.ReviewGCN import ReviewGCN
 
 
 class Model(nn.Module):
-    def __init__(self, input_dim, output_dim, A_A, A_B, Review_A, Review_B):
+    def __init__(self, output_dim, Rating_A, Rating_B, Review_A, Review_B):
         super().__init__()
 
-        self.A_A = A_A
-        self.A_B = A_B
+        self.A_A = Rating_A
+        self.A_B = Rating_B
 
-        self.feature_idx_A = [i for i in range(A_A.shape[0])]
-        # self.features_A = torch.from_numpy(self.A_A[self.feature_idx_A])
-        self.features_A = self.A_A[self.feature_idx_A]
-        self.GNN_A = GCN(input_dim, output_dim, A_A)
-        self.ReviewGCN_A = ReviewGCN(input_dim, output_dim, Review_A)
+        self.rating_idx_A = [i for i in range(Rating_A.shape[0])]
+        # self.features_A = torch.from_numpy(self.A_A[self.rating_idx_A])
+        self.rating_A = self.A_A[self.rating_idx_A]
+        self.GNN_A = GCN(Rating_A)
+        self.ReviewGCN_A = ReviewGCN(Review_A)
+        self.review_A = torch.ones_like(Review_A)
 
-        self.feature_idx_B = [i for i in range(A_B.shape[0])]
-        # self.features_B = torch.from_numpy(self.A_B[self.feature_idx_B])
-        self.features_B = self.A_B[self.feature_idx_B]
-        self.GNN_B = GCN(input_dim, output_dim, A_B)
-        self.ReviewGCN_B = ReviewGCN(input_dim, output_dim, Review_B)
+        self.rating_idx_B = [i for i in range(Rating_B.shape[0])]
+        # self.features_B = torch.from_numpy(self.A_B[self.rating_idx_B])
+        self.rating_B = self.A_B[self.rating_idx_B]
+        self.GNN_B = GCN(Rating_B)
+        self.ReviewGCN_B = ReviewGCN(Review_B)
+        self.review_B = torch.ones_like(Review_B)
 
         self.user_W_Attention_A_A = nn.Parameter(
-            torch.randn(A_A.shape[0], input_dim),
+            torch.randn(Rating_A.shape[0], output_dim),
             requires_grad=True
         )
         self.user_W_Attention_B_B = nn.Parameter(
-            torch.randn(A_B.shape[0], input_dim),
+            torch.randn(Rating_B.shape[0], output_dim),
             requires_grad=True
         )
 
-        self.umlp_A = MLP(input_dim)
-        self.imlp_A = MLP(input_dim)
-        self.umlp_B = MLP(input_dim)
-        self.imlp_B = MLP(input_dim)
+        self.umlp_A = MLP(output_dim)
+        self.imlp_A = MLP(output_dim)
+        self.umlp_B = MLP(output_dim)
+        self.imlp_B = MLP(output_dim)
 
     def forward(self, u, i, domain):
-        features_A = self.GNN_A(self.features_A)
+        rating_A = self.GNN_A(self.rating_A)
+        review_A = self.ReviewGCN_A(self.review_A)
+        user_A = rating_A[u] + review_A[u]
 
-        features_B = self.GNN_A(self.features_B)
+        rating_B = self.GNN_B(self.rating_B)
+        review_B = self.ReviewGCN_B(self.review_B)
+        user_B = rating_B[u] + review_B[u]
 
-        user_A = features_A[u]
         user_W_Attention_A_A = self.user_W_Attention_A_A[u]
         user_W_Attention_B_A = 1 - user_W_Attention_A_A
-        user_B = features_B[u]
+
         user_W_Attention_B_B = self.user_W_Attention_B_B[u]
         user_W_Attention_A_B = 1 - user_W_Attention_B_B
 
         if domain == 'A':
-            item = features_A[i]
+            item = rating_A[i]
             user = torch.add(
                 torch.mul(user_A, user_W_Attention_A_A),
                 torch.mul(user_B, user_W_Attention_B_A)
@@ -59,7 +64,7 @@ class Model(nn.Module):
             user = self.umlp_A(user)
             item = self.imlp_A(item)
         else:
-            item = features_B[i]
+            item = rating_B[i]
             user = torch.add(
                 torch.mul(user_B, user_W_Attention_B_B),
                 torch.mul(user_A, user_W_Attention_A_B)

@@ -14,7 +14,6 @@ from dataset.Dataset import Dataset
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
-from model.ReviewGraphBuilder import BuildGraph
 allResults = []
 
 
@@ -55,7 +54,7 @@ def main(dataName_A, dataName_B):
     parser.add_argument('-output_dim',
                         action='store',
                         dest='output_dim',
-                        default=10)
+                        default=20)
     args = parser.parse_args()
 
     classifier = trainer(args)
@@ -84,12 +83,11 @@ class trainer:
             A_user_rating_dict, A_user_review_dict, A_item_user_dict)
         self.dataset_B = Dataset(
             B_user_rating_dict, B_user_review_dict, B_item_user_dict)
-        # self.jj = GraphBuilder()
-        self.jj = BuildGraph()
-        self.Review_A, self.Review_B = self.jj.getGraph(A_user_review_dict,
-                                                A_item_user_dict,
-                                                B_user_review_dict,
-                                                B_item_user_dict)
+        self.ReviewGraph = GraphBuilder(A_user_review_dict,
+                               A_item_user_dict,
+                               B_user_review_dict,
+                               B_item_user_dict)
+        self.Review_A, self.Review_B = self.ReviewGraph.adj()
 
         self.adj_A = self.dataset_A.adj
         self.dataset_A.getTrainTest()
@@ -108,7 +106,7 @@ class trainer:
 
     def run(self):
 
-        model = Model(self.input_dim, self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
+        model = Model(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         optimizer = optim.Adam(model.parameters(), lr=self.lr)
         best_HR = -1
         best_NDCG = -1
@@ -193,7 +191,7 @@ class trainer:
                     train_i_batch = torch.tensor(train_i_batch)
                     train_r_batch = torch.tensor(train_r_batch)
 
-                    user_out, item_out = model(train_u_batch, train_i_batch)
+                    user_out, item_out = model(train_u_batch, train_i_batch, 'B')
 
                     norm_user_output = torch.sqrt(
                         torch.sum(torch.square(user_out), axis=1))
@@ -217,7 +215,7 @@ class trainer:
                     loss_B = torch.cat((loss_B, batchLoss_B.view(1, -1)), dim=1)
 
             loss_B = torch.mean(loss_B)
-            print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_B))
+            print("\nMean Loss_B in epoch {} is: {}\n".format(epoch + 1, loss_B))
 
 
 
@@ -227,9 +225,11 @@ class trainer:
             NDCG = []
             testUser = self.testNeg_A[0]
             testItem = self.testNeg_A[1]
+            print(len(testUser))
             for i in range(len(testUser)):
+                print(i)
                 target = testItem[i][0]
-                user_out, item_out = model(testUser[i], testItem[i])
+                user_out, item_out = model(testUser[i], testItem[i], 'A')
                 norm_user_output = torch.sqrt(
                     torch.sum(torch.square(user_out), axis=1))
                 norm_item_output = torch.sqrt(
@@ -266,7 +266,7 @@ class trainer:
 
             HR = np.mean(HR)
             NDCG = np.mean(NDCG)
-            allResults.append([epoch + 1, topK, HR, NDCG, loss.detach().numpy()])
+            allResults.append([epoch + 1, topK, HR, NDCG, loss_A.detach().numpy()])
             print(
                 "Epoch ", epoch + 1,
                 "TopK: {} HR: {}, NDCG: {}".format(
@@ -285,8 +285,8 @@ class trainer:
         bestPerformance = [[best_HR, best_NDCG, best_epoch]]
         model.eval()
         with torch.no_grad():
-            userVecs = [model(u, testItem[0])[0] for u in testUser]
-            itemVecs = [model(testUser[0], i)[1] for i in testItem]
+            userVecs = [model(u, testItem[0], 'A')[0] for u in testUser]
+            itemVecs = [model(testUser[0], i, 'A')[1] for i in testItem]
             userVecs = [i.detach().numpy().reshape(-1) for i in userVecs]
             itemVecs = [i.detach().numpy().reshape(-1) for i in itemVecs]
 
