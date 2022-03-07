@@ -3,21 +3,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 from model.GraphConv import GraphConv
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class ReviewGCN(nn.Module):
     def __init__(self, A):
         super().__init__()
 
-        I = torch.eye(A.shape[0])
-        A_hat = A + I
-        D = torch.sum(A_hat, axis=0)
-        D = torch.sqrt(D)
-        D = torch.diag(D)
-        D_inv = torch.inverse(D)
-        pre = torch.mm(torch.mm(D_inv, A_hat), D_inv)
+        self.I = torch.eye(A.shape[0]).to(device)
+        self.A_hat = A + self.I
+        self.D = torch.sum(self.A_hat, axis=0)
+        self.D = torch.sqrt(self.D)
+        self.D = torch.diag(self.D)
+        self.D_inv = torch.inverse(self.D)
+        self.pre = torch.mm(torch.mm(self.D_inv, self.A_hat), self.D_inv)
 
-        self.layer1 = GraphConv(A.shape[0], 200, pre, dropout=0.5)
-        self.layer2 = GraphConv(200, 20, pre, dropout=0.5)
+        self.layer1 = GraphConv(A.shape[0], 200, self.pre, dropout=0.5)
+        self.layer2 = GraphConv(200, 20, self.pre, dropout=0.5)
 
     def forward(self, features):
         x = self.layer1(features)

@@ -8,14 +8,18 @@ import argparse
 import heapq
 import math
 import scipy.io as scio
-from model.Model import Model
+from model.Model import Model, Model_pl
 from dataset.datareader import Datareader
 from dataset.Dataset import Dataset
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
+from tqdm import tqdm
 allResults = []
 
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main(dataName_A, dataName_B):
     parser = argparse.ArgumentParser(description="Options")
@@ -30,7 +34,7 @@ def main(dataName_A, dataName_B):
     parser.add_argument('-maxEpochs',
                         action='store',
                         dest='maxEpochs',
-                        default=1)
+                        default=10)
     parser.add_argument('-lr',
                         action='store',
                         dest='lr',
@@ -89,13 +93,14 @@ class trainer:
                                B_item_user_dict)
         self.Review_A, self.Review_B = self.ReviewGraph.adj()
 
-        self.adj_A = self.dataset_A.adj
+        self.Review_A, self.Review_B = self.Review_A.to(device), self.Review_B.to(device)
+        self.adj_A = self.dataset_A.adj.to(device)
         self.dataset_A.getTrainTest()
         self.dataset_A.getTrainDict()
         self.train_A, self.test_A = self.dataset_A.train, self.dataset_A.test
         self.testNeg_A = self.dataset_A.getTestNeg(self.test_A, self.negNum)
 
-        self.adj_B = self.dataset_B.adj
+        self.adj_B = self.dataset_B.adj.to(device)
         self.dataset_B.getTrainTest()
         self.dataset_B.getTrainDict()
         self.train_B, self.test_B = self.dataset_B.train, self.dataset_B.test
@@ -107,6 +112,9 @@ class trainer:
     def run(self):
 
         model = Model(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
+        # model_pl = Model_pl(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
+        model = model.to(device)
+        print('training on device:', device)
         optimizer = optim.Adam(model.parameters(), lr=self.lr)
         best_HR = -1
         best_NDCG = -1
@@ -126,7 +134,7 @@ class trainer:
 
             num_batches = train_len_A // self.batchSize + 1
 
-            loss_A = torch.zeros(0)
+            loss_A = torch.zeros(0).to(device)
             for i in range(num_batches):
                 min_idx = i * self.batchSize
                 max_idx = np.min([train_len_A, (i + 1) * self.batchSize])
@@ -136,9 +144,9 @@ class trainer:
                     train_i_batch = train_i_A[min_idx:max_idx]
                     train_r_batch = train_r_A[min_idx:max_idx]
 
-                    train_u_batch = torch.tensor(train_u_batch)
-                    train_i_batch = torch.tensor(train_i_batch)
-                    train_r_batch = torch.tensor(train_r_batch)
+                    train_u_batch = torch.tensor(train_u_batch).to(device)
+                    train_i_batch = torch.tensor(train_i_batch).to(device)
+                    train_r_batch = torch.tensor(train_r_batch).to(device)
 
                     user_out, item_out = model(train_u_batch, train_i_batch, 'A')
 
@@ -160,7 +168,8 @@ class trainer:
                     optimizer.zero_grad()
                     batchLoss_A.backward(train_u_batch)
                     optimizer.step()
-
+                    # print('loss_A:', loss_A)
+                    # print('batchLoss_A:', batchLoss_A)
                     loss_A = torch.cat((loss_A, batchLoss_A.view(1, -1)), dim=1)
 
             loss_A = torch.mean(loss_A)
@@ -177,7 +186,7 @@ class trainer:
 
             num_batches = train_len_B // self.batchSize + 1
 
-            loss_B = torch.zeros(0)
+            loss_B = torch.zeros(0).to(device)
             for i in range(num_batches):
                 min_idx = i * self.batchSize
                 max_idx = np.min([train_len_B, (i + 1) * self.batchSize])
@@ -187,9 +196,9 @@ class trainer:
                     train_i_batch = train_i_B[min_idx:max_idx]
                     train_r_batch = train_r_B[min_idx:max_idx]
 
-                    train_u_batch = torch.tensor(train_u_batch)
-                    train_i_batch = torch.tensor(train_i_batch)
-                    train_r_batch = torch.tensor(train_r_batch)
+                    train_u_batch = torch.tensor(train_u_batch).to(device)
+                    train_i_batch = torch.tensor(train_i_batch).to(device)
+                    train_r_batch = torch.tensor(train_r_batch).to(device)
 
                     user_out, item_out = model(train_u_batch, train_i_batch, 'B')
 
@@ -225,9 +234,9 @@ class trainer:
             NDCG = []
             testUser = self.testNeg_A[0]
             testItem = self.testNeg_A[1]
-            print(len(testUser))
-            for i in range(len(testUser)):
-                print(i)
+            print('testUser : ', len(testUser))
+            for i in tqdm(range(len(testUser))):
+                # print(i)
                 target = testItem[i][0]
                 user_out, item_out = model(testUser[i], testItem[i], 'A')
                 norm_user_output = torch.sqrt(
@@ -266,7 +275,7 @@ class trainer:
 
             HR = np.mean(HR)
             NDCG = np.mean(NDCG)
-            allResults.append([epoch + 1, topK, HR, NDCG, loss_A.detach().numpy()])
+            allResults.append([epoch + 1, topK, HR, NDCG, loss_A.detach().cpu().numpy()])
             print(
                 "Epoch ", epoch + 1,
                 "TopK: {} HR: {}, NDCG: {}".format(
@@ -287,8 +296,8 @@ class trainer:
         with torch.no_grad():
             userVecs = [model(u, testItem[0], 'A')[0] for u in testUser]
             itemVecs = [model(testUser[0], i, 'A')[1] for i in testItem]
-            userVecs = [i.detach().numpy().reshape(-1) for i in userVecs]
-            itemVecs = [i.detach().numpy().reshape(-1) for i in itemVecs]
+            userVecs = [i.detach().cpu().numpy().reshape(-1) for i in userVecs]
+            itemVecs = [i.detach().cpu().numpy().reshape(-1) for i in itemVecs]
 
             tsne = TSNE(n_components=2, init='pca', random_state=0)
             user2D = tsne.fit_transform(userVecs)

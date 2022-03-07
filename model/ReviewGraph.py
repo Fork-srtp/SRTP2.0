@@ -157,7 +157,7 @@ class GraphBuilder:
 
         # get 某一个item的所有review
         for item, reviews in A_item_user_dict.items():
-            str = ' '
+            str = ""
             for meta_review in reviews:
                 str += " "
                 str += meta_review[1]
@@ -181,7 +181,7 @@ class GraphBuilder:
 
         # get 某一个item的所有review
         for item, reviews in B_item_user_dict.items():
-            str = ' '
+            str = ""
             for meta_review in reviews:
                 str += " "
                 str += meta_review[1]
