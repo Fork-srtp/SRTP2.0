@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
 from tqdm import tqdm
+from tensorboardX import SummaryWriter
 allResults = []
 
 
@@ -114,6 +115,7 @@ class trainer:
         model = Model(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         # model_pl = Model_pl(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         model = model.to(device)
+        writer = SummaryWriter()
         print('training on device:', device)
         optimizer = optim.Adam(model.parameters(), lr=self.lr)
         best_HR = -1
@@ -174,6 +176,7 @@ class trainer:
 
             loss_A = torch.mean(loss_A)
             print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_A))
+            writer.add_scalar('loss_A', loss_A, global_step=epoch)
 
             # domain B
             train_u_B, train_i_B, train_r_B = self.dataset_B.getInstances(
@@ -225,6 +228,7 @@ class trainer:
 
             loss_B = torch.mean(loss_B)
             print("\nMean Loss_B in epoch {} is: {}\n".format(epoch + 1, loss_B))
+            writer.add_scalar('loss_B', loss_B, global_step=epoch)
 
 
 
