@@ -74,7 +74,7 @@ class Model(nn.Module):
             user = self.umlp_B(user)
             item = self.imlp_B(item)
 
-        return user, item
+        return user, item, review_A[u], review_B[u]
 
 
 

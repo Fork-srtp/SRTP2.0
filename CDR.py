@@ -9,13 +9,13 @@ import heapq
 import math
 import scipy.io as scio
 from model.Model import Model, Model_pl
+from model.Discriminator import Discriminator
 from dataset.datareader import Datareader
 from dataset.Dataset import Dataset
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
 from tqdm import tqdm
-from tensorboardX import SummaryWriter
 allResults = []
 
 
@@ -113,11 +113,21 @@ class trainer:
     def run(self):
 
         model = Model(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
+        d = Discriminator(20)
         # model_pl = Model_pl(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         model = model.to(device)
-        writer = SummaryWriter()
         print('training on device:', device)
         optimizer = optim.Adam(model.parameters(), lr=self.lr)
+        optimizer_G_params = [model.ReviewGCN_A.layer1.weight,
+                              model.ReviewGCN_A.layer1.bias,
+                              model.ReviewGCN_A.layer2.weight,
+                              model.ReviewGCN_A.layer2.bias,
+                              model.ReviewGCN_B.layer1.weight,
+                              model.ReviewGCN_B.layer1.bias,
+                              model.ReviewGCN_B.layer2.weight,
+                              model.ReviewGCN_B.layer2.bias]
+        optimizer_G = optim.Adam(optimizer_G_params, lr=self.lr)
+        optimizer_D = optim.Adam(d.parameters(), lr=0.001)
         best_HR = -1
         best_NDCG = -1
         best_epoch = -1
@@ -150,7 +160,39 @@ class trainer:
                     train_i_batch = torch.tensor(train_i_batch).to(device)
                     train_r_batch = torch.tensor(train_r_batch).to(device)
 
-                    user_out, item_out = model(train_u_batch, train_i_batch, 'A')
+                    user_out, item_out, Review_A, Review_B = model(train_u_batch, train_i_batch, 'A')
+
+                    label_A = d(Review_A.detach())
+                    label_B = d(Review_B.detach())
+
+                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (1 - label_A < 1e-6)
+                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (1 - label_B < 1e-6)
+
+                    loss_d = - (torch.ones_like(label_A) * torch.log(
+                        label_A) + (1 - torch.ones_like(label_A)) * torch.log(
+                        1 - label_A)) - (torch.zeros_like(label_B) * torch.log(
+                        label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
+                        1 - label_B))
+
+                    optimizer_D.zero_grad()
+                    loss_d.backward(label_A)
+                    optimizer_D.step()
+
+                    label_A = d(Review_A)
+                    label_B = d(Review_B)
+
+                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (label_A == 1)
+                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (label_B == 1)
+
+                    loss_g = (torch.ones_like(label_A) * torch.log(
+                        label_A) + (1 - torch.ones_like(label_A)) * torch.log(
+                        1 - label_A)) + (torch.zeros_like(label_B) * torch.log(
+                        label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
+                        1 - label_B))
+                    print(torch.mean(loss_g))
+                    # optimizer_G.zero_grad()
+                    loss_g.backward(label_B, retain_graph=True)
+                    # optimizer_G.step()
 
                     norm_user_output = torch.sqrt(
                         torch.sum(torch.square(user_out), axis=1))
@@ -170,13 +212,13 @@ class trainer:
                     optimizer.zero_grad()
                     batchLoss_A.backward(train_u_batch)
                     optimizer.step()
+                    # optimizer_G.step()
                     # print('loss_A:', loss_A)
                     # print('batchLoss_A:', batchLoss_A)
                     loss_A = torch.cat((loss_A, batchLoss_A.view(1, -1)), dim=1)
 
             loss_A = torch.mean(loss_A)
             print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_A))
-            writer.add_scalar('loss_A', loss_A, global_step=epoch)
 
             # domain B
             train_u_B, train_i_B, train_r_B = self.dataset_B.getInstances(
@@ -203,7 +245,39 @@ class trainer:
                     train_i_batch = torch.tensor(train_i_batch).to(device)
                     train_r_batch = torch.tensor(train_r_batch).to(device)
 
-                    user_out, item_out = model(train_u_batch, train_i_batch, 'B')
+                    user_out, item_out, Review_A, Review_B = model(train_u_batch, train_i_batch, 'B')
+
+                    label_A = d(Review_A.detach())
+                    label_B = d(Review_B.detach())
+
+                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (1 - label_A < 1e-6)
+                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (1 - label_B < 1e-6)
+
+                    loss_d = - (torch.ones_like(label_A) * torch.log(
+                        label_A) + (1 - torch.ones_like(label_A)) * torch.log(
+                        1 - label_A)) - (torch.zeros_like(label_B) * torch.log(
+                        label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
+                        1 - label_B))
+
+                    optimizer_D.zero_grad()
+                    loss_d.backward(label_A)
+                    optimizer_D.step()
+
+                    label_A = d(Review_A)
+                    label_B = d(Review_B)
+
+                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (label_A == 1)
+                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (label_B == 1)
+
+                    loss_g = (torch.ones_like(label_A) * torch.log(
+                        label_A) + (1 - torch.ones_like(label_A)) * torch.log(
+                        1 - label_A)) + (torch.zeros_like(label_B) * torch.log(
+                        label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
+                        1 - label_B))
+                    print(torch.mean(loss_g))
+                    # optimizer_G.zero_grad()
+                    loss_g.backward(label_B, retain_graph=True)
+                    # optimizer_G.step()
 
                     norm_user_output = torch.sqrt(
                         torch.sum(torch.square(user_out), axis=1))
@@ -228,7 +302,6 @@ class trainer:
 
             loss_B = torch.mean(loss_B)
             print("\nMean Loss_B in epoch {} is: {}\n".format(epoch + 1, loss_B))
-            writer.add_scalar('loss_B', loss_B, global_step=epoch)
 
 
 
@@ -242,7 +315,7 @@ class trainer:
             for i in tqdm(range(len(testUser))):
                 # print(i)
                 target = testItem[i][0]
-                user_out, item_out = model(testUser[i], testItem[i], 'A')
+                user_out, item_out, _, _ = model(testUser[i], testItem[i], 'A')
                 norm_user_output = torch.sqrt(
                     torch.sum(torch.square(user_out), axis=1))
                 norm_item_output = torch.sqrt(
