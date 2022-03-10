@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
 from tqdm import tqdm
+from tensorboardX import SummaryWriter
 allResults = []
 
 
@@ -35,7 +36,7 @@ def main(dataName_A, dataName_B):
     parser.add_argument('-maxEpochs',
                         action='store',
                         dest='maxEpochs',
-                        default=10)
+                        default=100)
     parser.add_argument('-lr',
                         action='store',
                         dest='lr',
@@ -116,6 +117,7 @@ class trainer:
         d = Discriminator(20)
         # model_pl = Model_pl(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         model = model.to(device)
+        writer = SummaryWriter('runs/latest')
         print('training on device:', device)
         optimizer = optim.Adam(model.parameters(), lr=self.lr)
         optimizer_G_params = [model.ReviewGCN_A.layer1.weight,
@@ -219,6 +221,7 @@ class trainer:
 
             loss_A = torch.mean(loss_A)
             print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_A))
+            writer.add_scalar('loss/loss_A', loss_A, global_step=epoch)
 
             # domain B
             train_u_B, train_i_B, train_r_B = self.dataset_B.getInstances(
@@ -302,6 +305,7 @@ class trainer:
 
             loss_B = torch.mean(loss_B)
             print("\nMean Loss_B in epoch {} is: {}\n".format(epoch + 1, loss_B))
+            writer.add_scalar('loss/loss_B', loss_B, global_step=epoch)
 
 
 
@@ -352,6 +356,9 @@ class trainer:
 
             HR = np.mean(HR)
             NDCG = np.mean(NDCG)
+            writer.add_scalar('others/HR', HR, global_step=epoch)
+            writer.add_scalar('others/NDCG', NDCG, global_step=epoch)
+
             allResults.append([epoch + 1, topK, HR, NDCG, loss_A.detach().cpu().numpy()])
             print(
                 "Epoch ", epoch + 1,
