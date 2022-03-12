@@ -3,13 +3,13 @@ import torch
 import networkx as nx
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from nltk.tokenize import word_tokenize
-
+from utils import print_graph_detail
 samplling_probability = 0.05
 
 class Dataset(object):
 	def __init__(self, user_rating_dict, user_review_dict, item_user_dict):
 		self.graph = nx.Graph()
-		self.data, self.adj, self.model_D2V = self.getData(
+		self.data, self.adj = self.getData(
 			user_rating_dict, user_review_dict, item_user_dict)
 		self.train, self.test = self.getTrainTest()
 		self.trainDict = self.getTrainDict()
@@ -27,8 +27,6 @@ class Dataset(object):
 		for index, node in enumerate(nodeset):
 			nodedict[node] = index
 
-		tagged_data = []
-		feature = []
 		u = 0
 		for user, reviews in user_review_dict.items():
 			u += 1
@@ -36,7 +34,6 @@ class Dataset(object):
 			for each in reviews:
 				str += " "
 				str += each[1]
-			tagged_data.append(TaggedDocument(words=word_tokenize(str), tags=[nodedict[user]]))
 
 		i = 0
 		for item, reviews in item_user_dict.items():
@@ -45,7 +42,6 @@ class Dataset(object):
 			for each in reviews:
 				str += " "
 				str += each[1]
-			tagged_data.append(TaggedDocument(words=word_tokenize(str), tags=[nodedict[item]]))
 
 		self.shape = [u, i]
 		print("user: {} item: {}".format(u, i))
@@ -60,39 +56,27 @@ class Dataset(object):
 
 		self.maxRate = maxr
 
-		max_epochs = 1
-		vec_size = 20
-		alpha = 0.025
-
-		model_D2V = Doc2Vec(dm=1,
-		                alpha=alpha,
-		                vector_size=vec_size,
-		                min_alpha=0.00025,
-	                    min_count=1)
-
-		model_D2V.build_vocab(tagged_data)
-
-		for epoch in range(max_epochs):
-			model_D2V.train(tagged_data,
-		                total_examples=(u+i),
-		                epochs=model_D2V.epochs)
-			# decrease the learning rate
-			model_D2V.alpha -= 0.0002
-			# fix the learning rate, no decay
-			model_D2V.min_alpha = model_D2V.alpha
-			if (epoch + 1) % 10 == 0:
-				print('Doc2Vec iteration {0}'.format(epoch + 1))
-
+		print_graph_detail(self.graph)
 		adj_matrix = nx.adjacency_matrix(self.graph)
 		e = list(self.graph.edges.data())
 		adj = torch.zeros(u + i, u + i)
 
-		for edge in e:
-			adj[edge[0]][edge[1]] = edge[2]['weight']
-			adj[edge[1]][edge[0]] = edge[2]['weight']
+		for i in range(len(data)-1):
+			user = data[i][0]
+			item = data[i][1]
+			rate = data[i][2]
+			if data[i][0] != data[i+1][0]:
+				pass
+			else:
+				adj[user][item] = rate
+				adj[item][user] = rate
+
+		# for edge in e:
+		# 	adj[edge[0]][edge[1]] = edge[2]['weight']
+		# 	adj[edge[1]][edge[0]] = edge[2]['weight']
 		adj = adj.type(torch.FloatTensor)
 
-		return data, adj, model_D2V
+		return data, adj
 
 	def getTrainTest(self):
 		data = self.data
