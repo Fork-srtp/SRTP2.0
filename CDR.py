@@ -115,6 +115,7 @@ class trainer:
 
         model = Model(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         d = Discriminator(20)
+        d = d.to(device)
         # model_pl = Model_pl(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         model = model.to(device)
         writer = SummaryWriter('runs/latest')
