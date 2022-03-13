@@ -61,6 +61,7 @@ class Dataset(object):
 		e = list(self.graph.edges.data())
 		adj = torch.zeros(u + i, u + i)
 
+		data = sorted(data, key=lambda x: x[0])
 		for i in range(len(data)-1):
 			user = data[i][0]
 			item = data[i][1]

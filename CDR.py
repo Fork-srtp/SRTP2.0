@@ -192,7 +192,7 @@ class trainer:
                         1 - label_A)) + (torch.zeros_like(label_B) * torch.log(
                         label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
                         1 - label_B))
-                    print(torch.mean(loss_g))
+                    # print(torch.mean(loss_g))
                     # optimizer_G.zero_grad()
                     loss_g.backward(label_B, retain_graph=True)
                     # optimizer_G.step()
@@ -278,7 +278,7 @@ class trainer:
                         1 - label_A)) + (torch.zeros_like(label_B) * torch.log(
                         label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
                         1 - label_B))
-                    print(torch.mean(loss_g))
+                    # print(torch.mean(loss_g))
                     # optimizer_G.zero_grad()
                     loss_g.backward(label_B, retain_graph=True)
                     # optimizer_G.step()
