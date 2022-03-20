@@ -8,7 +8,7 @@ import argparse
 import heapq
 import math
 import scipy.io as scio
-from model.Model import Model, Model_pl
+from model.Model import Model
 from model.Discriminator import Discriminator
 from dataset.datareader import Datareader
 from dataset.Dataset import Dataset
@@ -61,6 +61,14 @@ def main(dataName_A, dataName_B):
                         action='store',
                         dest='output_dim',
                         default=20)
+    parser.add_argument('-emb_dim',
+                        action='store',
+                        dest='emb_dim',
+                        default=200)
+    parser.add_argument('-topK',
+                        action='store',
+                        dest='topK',
+                        default=4)
     args = parser.parse_args()
 
     classifier = trainer(args)
@@ -79,6 +87,8 @@ class trainer:
         self.negNum = args.negNum
         self.input_dim = args.input_dim
         self.output_dim = args.output_dim
+        self.emb_dim = args.emb_dim
+        self.topK = args.topK
 
         dr = Datareader(self.dataName_A, self.dataName_B)
         A_user_rating_dict, A_user_review_dict, A_item_user_dict, \
@@ -111,12 +121,12 @@ class trainer:
         self.maxRate_A = self.dataset_A.maxRate
         self.maxRate_B = self.dataset_B.maxRate
 
+
     def run(self):
 
-        model = Model(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
-        d = Discriminator(20)
+        model = Model(self.emb_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
+        d = Discriminator(int(self.emb_dim / 2))
         d = d.to(device)
-        # model_pl = Model_pl(self.output_dim, self.adj_A, self.adj_B, self.Review_A, self.Review_B)
         model = model.to(device)
         writer = SummaryWriter('runs/latest')
         print('training on device:', device)
@@ -129,14 +139,14 @@ class trainer:
                               model.ReviewGCN_B.layer1.bias,
                               model.ReviewGCN_B.layer2.weight,
                               model.ReviewGCN_B.layer2.bias]
-        optimizer_G = optim.Adam(optimizer_G_params, lr=self.lr)
+        optimizer_G = optim.Adam(optimizer_G_params, lr=0.00001247)
         optimizer_D = optim.Adam(d.parameters(), lr=0.001)
         best_HR = -1
         best_NDCG = -1
         best_epoch = -1
 
         model.train()
-        topK = 4
+        topK = self.topK
         for epoch in range(self.maxEpochs):
             print("=" * 20 + "Epoch ", epoch + 1, "=" * 20)
             train_u_A, train_i_A, train_r_A = self.dataset_A.getInstances(
@@ -167,34 +177,40 @@ class trainer:
 
                     label_A = d(Review_A.detach())
                     label_B = d(Review_B.detach())
+                    if torch.isnan(torch.mean(label_A)):
+                        print("1")
+                    # print("label_A:{}".format(torch.mean(label_A)))
+                    # print("label_B:{}".format(torch.mean(label_B)))
 
                     label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (1 - label_A < 1e-6)
                     label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (1 - label_B < 1e-6)
 
-                    loss_d = - (torch.ones_like(label_A) * torch.log(
+                    loss_d = torch.mean(- (torch.ones_like(label_A) * torch.log(
                         label_A) + (1 - torch.ones_like(label_A)) * torch.log(
                         1 - label_A)) - (torch.zeros_like(label_B) * torch.log(
                         label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
-                        1 - label_B))
+                        1 - label_B)))
+
+                    # print(loss_d)
 
                     optimizer_D.zero_grad()
-                    loss_d.backward(label_A)
+                    loss_d.backward()
                     optimizer_D.step()
 
                     label_A = d(Review_A)
                     label_B = d(Review_B)
 
-                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (label_A == 1)
-                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (label_B == 1)
+                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (1 - label_A < 1e-6)
+                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (1 - label_B < 1e-6)
 
-                    loss_g = (torch.ones_like(label_A) * torch.log(
+                    loss_g = torch.mean((torch.ones_like(label_A) * torch.log(
                         label_A) + (1 - torch.ones_like(label_A)) * torch.log(
                         1 - label_A)) + (torch.zeros_like(label_B) * torch.log(
                         label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
-                        1 - label_B))
+                        1 - label_B)))
                     # print(torch.mean(loss_g))
-                    # optimizer_G.zero_grad()
-                    loss_g.backward(label_B, retain_graph=True)
+                    optimizer_G.zero_grad()
+                    loss_g.backward(retain_graph=True)
                     # optimizer_G.step()
 
                     norm_user_output = torch.sqrt(
@@ -203,25 +219,43 @@ class trainer:
                         torch.sum(torch.square(item_out), axis=1))
                     regularizer = F.mse_loss(user_out, torch.zeros_like(user_out)) + F.mse_loss(
                         item_out, torch.zeros_like(item_out))
-                    y_hat = torch.sum(
-                        torch.mul(user_out, item_out), axis=1
-                    ) / (norm_user_output * norm_item_output)
-                    y_hat = y_hat + (1e-6) * (y_hat < 1e-6)
+                    if torch.sum(norm_user_output * norm_item_output):
+                        y_hat = torch.sum(
+                            torch.mul(user_out, item_out), axis=1
+                        ) / (norm_user_output * norm_item_output)
+                    else:
+                        y_hat = torch.sum(
+                            torch.mul(user_out, item_out), axis=1
+                        )
+                    # y_hat = y_hat + (1e-6) * (y_hat < 1e-6) - (1e-6) * (1 - y_hat < 1e-6)
+                    y_hat = torch.maximum(torch.zeros_like(y_hat) + 1e-6, y_hat)
                     regRate = train_r_batch / self.maxRate_A
                     batchLoss_A = -(regRate * torch.log(
                         y_hat) + (1 - regRate) * torch.log(
                         1 - y_hat)) + self.lambdad * regularizer
 
+                    # if torch.isnan(torch.mean(batchLoss_A)):
+                    #     print("!2")
+
+                    # print("batchLoss_A:{}".format(torch.mean(batchLoss_A)))
+
                     optimizer.zero_grad()
                     batchLoss_A.backward(train_u_batch)
                     optimizer.step()
-                    # optimizer_G.step()
+                    optimizer_G.step()
+                    # for name, parameter in model.named_parameters():
+                    #     print(name)
+                    #     if torch.isnan(torch.mean(parameter)):
+                    #         print("12")
+                    #     # print("grad: ", torch.mean(parameter.grad))
+                    #     print("value: ", torch.mean(parameter))
+                    #     print("\n")
                     # print('loss_A:', loss_A)
                     # print('batchLoss_A:', batchLoss_A)
                     loss_A = torch.cat((loss_A, batchLoss_A.view(1, -1)), dim=1)
 
             loss_A = torch.mean(loss_A)
-            print("\nMean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_A))
+            print("Mean Loss_A in epoch {} is: {}\n".format(epoch + 1, loss_A))
             writer.add_scalar('loss/loss_A', loss_A, global_step=epoch)
 
             # domain B
@@ -257,30 +291,30 @@ class trainer:
                     label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (1 - label_A < 1e-6)
                     label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (1 - label_B < 1e-6)
 
-                    loss_d = - (torch.ones_like(label_A) * torch.log(
+                    loss_d = torch.mean(- (torch.ones_like(label_A) * torch.log(
                         label_A) + (1 - torch.ones_like(label_A)) * torch.log(
                         1 - label_A)) - (torch.zeros_like(label_B) * torch.log(
                         label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
-                        1 - label_B))
+                        1 - label_B)))
 
                     optimizer_D.zero_grad()
-                    loss_d.backward(label_A)
+                    loss_d.backward()
                     optimizer_D.step()
 
                     label_A = d(Review_A)
                     label_B = d(Review_B)
 
-                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (label_A == 1)
-                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (label_B == 1)
+                    label_A = label_A + (1e-6) * (label_A < 1e-6) - (1e-6) * (1 - label_A < 1e-6)
+                    label_B = label_B + (1e-6) * (label_B < 1e-6) - (1e-6) * (1 - label_B < 1e-6)
 
-                    loss_g = (torch.ones_like(label_A) * torch.log(
+                    loss_g = torch.mean((torch.ones_like(label_A) * torch.log(
                         label_A) + (1 - torch.ones_like(label_A)) * torch.log(
                         1 - label_A)) + (torch.zeros_like(label_B) * torch.log(
                         label_B) + (1 - torch.zeros_like(label_B)) * torch.log(
-                        1 - label_B))
+                        1 - label_B)))
                     # print(torch.mean(loss_g))
-                    # optimizer_G.zero_grad()
-                    loss_g.backward(label_B, retain_graph=True)
+                    optimizer_G.zero_grad()
+                    loss_g.backward(retain_graph=True)
                     # optimizer_G.step()
 
                     norm_user_output = torch.sqrt(
@@ -289,26 +323,42 @@ class trainer:
                         torch.sum(torch.square(item_out), axis=1))
                     regularizer = F.mse_loss(user_out, torch.zeros_like(user_out)) + F.mse_loss(
                         item_out, torch.zeros_like(item_out))
-                    y_hat = torch.sum(
-                        torch.mul(user_out, item_out), axis=1
-                    ) / (norm_user_output * norm_item_output)
-                    y_hat = y_hat + (1e-6) * (y_hat < 1e-6)
+                    if torch.sum(norm_user_output * norm_item_output):
+                        y_hat = torch.sum(
+                            torch.mul(user_out, item_out), axis=1
+                        ) / (norm_user_output * norm_item_output)
+                    else:
+                        y_hat = torch.sum(
+                            torch.mul(user_out, item_out), axis=1
+                        )
+                    # y_hat = y_hat + (1e-6) * (y_hat < 1e-6) - (1e-6) * (1 - y_hat < 1e-6)
+                    y_hat = torch.maximum(torch.zeros_like(y_hat) + 1e-6, y_hat)
                     regRate = train_r_batch / self.maxRate_B
                     batchLoss_B = -(regRate * torch.log(
                         y_hat) + (1 - regRate) * torch.log(
                         1 - y_hat)) + self.lambdad * regularizer
 
+                    # if torch.isnan(torch.mean(batchLoss_B)):
+                    #     print("!2")
                     optimizer.zero_grad()
                     batchLoss_B.backward(train_u_batch)
                     optimizer.step()
+                    optimizer_G.step()
+                    # for name, parameter in model.named_parameters():
+                    #     print(name)
+                    #     if torch.isnan(torch.mean(parameter)):
+                    #         print("12")
+                    #     # print("grad: ", torch.mean(parameter.grad))
+                    #     print("value: ", torch.mean(parameter))
+                    #     print("\n")
 
                     loss_B = torch.cat((loss_B, batchLoss_B.view(1, -1)), dim=1)
 
             loss_B = torch.mean(loss_B)
-            print("\nMean Loss_B in epoch {} is: {}\n".format(epoch + 1, loss_B))
+            print("Mean Loss_B in epoch {} is: {}\n".format(epoch + 1, loss_B))
             writer.add_scalar('loss/loss_B', loss_B, global_step=epoch)
 
-
+            print("loss_g in epoch {} is: {}\n".format(epoch + 1, torch.mean(loss_g)))
 
             model.eval()
 
@@ -362,7 +412,7 @@ class trainer:
 
             allResults.append([epoch + 1, topK, HR, NDCG, loss_A.detach().cpu().numpy()])
             print(
-                "Epoch ", epoch + 1,
+                "Epoch: ", epoch + 1,
                 "TopK: {} HR: {}, NDCG: {}".format(
                     topK, HR, NDCG))
 
@@ -408,7 +458,7 @@ class trainer:
 
 
 if __name__ == '__main__':
-    main('Arts_Crafts_and_Sewing_5', 'Luxury_Beauty_5')
+    main('Arts_Crafts_and_Sewing_5', 'Digital_Music_5')
     allResults = np.array(allResults)
     x_label = allResults[:, 0]
     y_topK = allResults[:, 1]

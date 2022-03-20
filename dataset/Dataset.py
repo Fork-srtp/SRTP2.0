@@ -69,8 +69,8 @@ class Dataset(object):
 			if data[i][0] != data[i+1][0]:
 				pass
 			else:
-				adj[user][item] = rate
-				adj[item][user] = rate
+				adj[user][item] = rate / maxr
+				adj[item][user] = rate / maxr
 
 		# for edge in e:
 		# 	adj[edge[0]][edge[1]] = edge[2]['weight']

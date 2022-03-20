@@ -9,6 +9,7 @@ from collections import defaultdict
 from time import time
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
@@ -253,7 +254,6 @@ class GraphBuilder:
         """
 
         # Domain A
-        start_A = time()
         text_tfidf_A = Pipeline([
             ("vect", CountVectorizer(min_df=1,
                                      max_df=1.0,
@@ -266,18 +266,13 @@ class GraphBuilder:
                                        ))
         ])
 
-        tfidf_vec_A = text_tfidf_A.fit_transform(np.array(self.review_A))
-
-        tfidf_time_A = time() - start_A
-        print("Domain A: ")
-        print("tfidf time:", tfidf_time_A)
-        print("tfidf_vec shape:", tfidf_vec_A.shape)
-        print("tfidf_vec type:", type(tfidf_vec_A))
+        # tfidf_vec_A = text_tfidf_A.fit_transform(np.array(self.review_A))
+        tfidf_vec_A = text_tfidf_A.fit_transform(self.review_A)
 
         self.node_num_A = tfidf_vec_A.shape[0]
 
         # 映射单词
-        vocab_lst_A = text_tfidf_A["vect"].get_feature_names()
+        vocab_lst_A = text_tfidf_A["vect"].get_feature_names_out()
         print("vocab_lst len:", len(vocab_lst_A))
         for ind, word in enumerate(vocab_lst_A):
             self.word2id_A[word] = ind
@@ -285,7 +280,6 @@ class GraphBuilder:
         self.vocab_lst_A = vocab_lst_A
 
         # Domain B
-        start_B = time()
         text_tfidf_B = Pipeline([
             ("vect", CountVectorizer(min_df=1,
                                      max_df=1.0,
@@ -298,18 +292,14 @@ class GraphBuilder:
                                        ))
         ])
 
-        tfidf_vec_B = text_tfidf_B.fit_transform(np.array(self.review_B))
-
-        tfidf_time_B = time() - start_B
-        print("Domain B: ")
-        print("tfidf time:", tfidf_time_B)
-        print("tfidf_vec shape:", tfidf_vec_B.shape)
-        print("tfidf_vec type:", type(tfidf_vec_B))
+        # tfidf_vec_B = text_tfidf_B.fit_transform(np.array(self.review_B))
+        tfidf_vec_B = text_tfidf_B.fit_transform(self.review_B)
 
         self.node_num_B = tfidf_vec_B.shape[0]
+        self.gB.add_nodes_from([i for i in range(tfidf_vec_B.shape[0] + tfidf_vec_B.shape[1])])
 
         # 映射单词
-        vocab_lst_B = text_tfidf_B["vect"].get_feature_names()
+        vocab_lst_B = text_tfidf_B["vect"].get_feature_names_out()
         print("vocab_lst len:", len(vocab_lst_B))
         for ind, word in enumerate(vocab_lst_B):
             self.word2id_B[word] = ind
