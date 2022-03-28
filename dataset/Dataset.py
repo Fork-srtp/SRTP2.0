@@ -52,14 +52,9 @@ class Dataset(object):
 				data.append((nodedict[user], nodedict[each[0]], each[1]))
 				if each[1] > maxr:
 					maxr = each[1]
-				self.graph.add_weighted_edges_from([(nodedict[user], nodedict[each[0]], each[1])])
+				# self.graph.add_weighted_edges_from([(nodedict[user], nodedict[each[0]], each[1])])
 
 		self.maxRate = maxr
-
-		print_graph_detail(self.graph)
-		adj_matrix = nx.adjacency_matrix(self.graph)
-		e = list(self.graph.edges.data())
-		adj = torch.zeros(u + i, u + i)
 
 		data = sorted(data, key=lambda x: x[0])
 		for i in range(len(data)-1):
@@ -69,15 +64,13 @@ class Dataset(object):
 			if data[i][0] != data[i+1][0]:
 				pass
 			else:
-				adj[user][item] = rate / maxr
-				adj[item][user] = rate / maxr
+				self.graph.add_weighted_edges_from([(user, item, rate / maxr)])
 
-		# for edge in e:
-		# 	adj[edge[0]][edge[1]] = edge[2]['weight']
-		# 	adj[edge[1]][edge[0]] = edge[2]['weight']
-		adj = adj.type(torch.FloatTensor)
+		for i in range(self.graph.number_of_nodes()):
+			self.graph.add_weighted_edges_from([(i, i, 1)])
+		print_graph_detail(self.graph)
 
-		return data, adj
+		return data, self.graph
 
 	def getTrainTest(self):
 		data = self.data

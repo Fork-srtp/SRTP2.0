@@ -17,6 +17,7 @@ from sklearn.manifold import TSNE
 from model.ReviewGraph import GraphBuilder
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
+from utils import preprocess_adj
 allResults = []
 
 
@@ -103,16 +104,22 @@ class trainer:
                                A_item_user_dict,
                                B_user_review_dict,
                                B_item_user_dict)
-        self.Review_A, self.Review_B = self.ReviewGraph.adj()
 
-        self.Review_A, self.Review_B = self.Review_A.to(device), self.Review_B.to(device)
-        self.adj_A = self.dataset_A.adj.to(device)
+        self.Review_A, self.Review_B = self.ReviewGraph.adj()
+        self.Review_A = preprocess_adj(self.Review_A).to(device)
+        self.Review_B = preprocess_adj(self.Review_B).to(device)
+
+        self.adj_A = self.dataset_A.adj
+        self.adj_A = preprocess_adj(self.adj_A).to(device)
+
         self.dataset_A.getTrainTest()
         self.dataset_A.getTrainDict()
         self.train_A, self.test_A = self.dataset_A.train, self.dataset_A.test
         self.testNeg_A = self.dataset_A.getTestNeg(self.test_A, self.negNum)
 
-        self.adj_B = self.dataset_B.adj.to(device)
+        self.adj_B = self.dataset_B.adj
+        self.adj_B = preprocess_adj(self.adj_B).to(device)
+
         self.dataset_B.getTrainTest()
         self.dataset_B.getTrainDict()
         self.train_B, self.test_B = self.dataset_B.train, self.dataset_B.test
@@ -378,7 +385,7 @@ class trainer:
                 y_hat = torch.sum(
                     torch.mul(user_out, item_out), axis=1
                 ) / (norm_user_output * norm_item_output)
-                y_hat = y_hat + (1e-6) * (y_hat < 1e-6)
+                y_hat = torch.maximum(torch.zeros_like(y_hat) + 1e-6, y_hat)
 
                 item_score_dict = {}
 
@@ -458,7 +465,7 @@ class trainer:
 
 
 if __name__ == '__main__':
-    main('Arts_Crafts_and_Sewing_5', 'Digital_Music_5')
+    main('Digital_Music_5', 'Grocery_and_Gourmet_Food')
     allResults = np.array(allResults)
     x_label = allResults[:, 0]
     y_topK = allResults[:, 1]

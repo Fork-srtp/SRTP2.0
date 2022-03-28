@@ -13,12 +13,10 @@ class GraphConv(nn.Module):
         self.bias = nn.Parameter(torch.zeros(output_dim), requires_grad=True)
 
     def forward(self, features):
-        aggregate = torch.mm(self.pre, features)
-        propagate = torch.mm(aggregate, self.weight) + self.bias
+        support = torch.spmm(features, self.weight)
+        output = torch.spmm(self.pre, support)
         if self.act == 'relu':
-            out = F.relu(propagate)
-        else:
-            out = propagate
-        out = self.dropout(out)
+            output = F.relu(output)
+        output = self.dropout(output)
 
-        return out
+        return output

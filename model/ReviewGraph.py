@@ -107,25 +107,12 @@ class GraphBuilder:
         self.get_pmi_edge()
 
     def adj(self):
-        e = list(self.gA.edges.data())
-        node_num = self.gA.number_of_nodes()
-        adj_A = torch.eye(node_num, node_num)
+        for i in range(self.gA.number_of_nodes()):
+            self.gA.add_weighted_edges_from([(i, i, 1)])
+        for i in range(self.gB.number_of_nodes()):
+            self.gB.add_weighted_edges_from([(i, i, 1)])
 
-        for edge in e:
-            adj_A[edge[0]][edge[1]] = edge[2]['weight']
-            adj_A[edge[1]][edge[0]] = edge[2]['weight']
-        adj_A = adj_A.type(torch.FloatTensor)
-
-        e = list(self.gB.edges.data())
-        node_num = self.gB.number_of_nodes()
-        adj_B = torch.eye(node_num, node_num)
-
-        for edge in e:
-            adj_B[edge[0]][edge[1]] = edge[2]['weight']
-            adj_B[edge[1]][edge[0]] = edge[2]['weight']
-        adj_B = adj_B.type(torch.FloatTensor)
-
-        return adj_A, adj_B
+        return self.gA, self.gB
 
     def getWords(self, sentence):
         cutwords1 = word_tokenize(sentence)
@@ -270,6 +257,7 @@ class GraphBuilder:
         tfidf_vec_A = text_tfidf_A.fit_transform(self.review_A)
 
         self.node_num_A = tfidf_vec_A.shape[0]
+        self.gA.add_nodes_from([i for i in range(tfidf_vec_A.shape[0] + tfidf_vec_A.shape[1])])
 
         # 映射单词
         vocab_lst_A = text_tfidf_A["vect"].get_feature_names_out()
