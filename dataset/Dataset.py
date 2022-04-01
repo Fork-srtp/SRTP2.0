@@ -66,8 +66,8 @@ class Dataset(object):
 			else:
 				self.graph.add_weighted_edges_from([(user, item, rate / maxr)])
 
-		for i in range(self.graph.number_of_nodes()):
-			self.graph.add_weighted_edges_from([(i, i, 1)])
+		# for i in range(self.graph.number_of_nodes()):
+			# self.graph.add_weighted_edges_from([(i, i, 1)])
 		print_graph_detail(self.graph)
 
 		return data, self.graph
@@ -104,9 +104,9 @@ class Dataset(object):
 			item.append(i[1])
 			rate.append(i[2])
 			for t in range(negNum):
-				j = np.random.randint(self.shape[1])
+				j = np.random.randint(self.shape[1]) + self.shape[0]
 				while (i[0], j) in self.trainDict:
-					j = np.random.randint(self.shape[1])
+					j = np.random.randint(self.shape[1]) + self.shape[0]
 				user.append(i[0])
 				item.append(j)
 				rate.append(0.0)
@@ -125,9 +125,9 @@ class Dataset(object):
 			neglist = set()
 			neglist.add(i)
 			for t in range(negNum):
-				j = np.random.randint(self.shape[1])
+				j = np.random.randint(self.shape[1]) + self.shape[0]
 				while (u, j) in self.trainDict or j in neglist:
-					j = np.random.randint(self.shape[1])
+					j = np.random.randint(self.shape[1]) + self.shape[0]
 				neglist.add(j)
 				tmp_user.append(u)
 				tmp_item.append(j)

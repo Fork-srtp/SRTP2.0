@@ -8,19 +8,20 @@ from utils import get_features
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Model(nn.Module):
-    def __init__(self, emb_dim, Rating_A, Rating_B, Review_A, Review_B):
+    def __init__(self, rating_dim, review_dim, Rating_A, Rating_B, Review_A, Review_B):
         super().__init__()
 
-        self.rating_A = get_features(Rating_A.shape[0])
-        self.rating_B = get_features(Rating_B.shape[0])
+        emb_dim = rating_dim + review_dim
+        self.rating_A = get_features(Rating_A.shape[0]).to(device)
+        self.rating_B = get_features(Rating_B.shape[0]).to(device)
 
-        self.GNN_A = GCN(int(emb_dim / 2), Rating_A)
-        self.ReviewGCN_A = ReviewGCN(int(emb_dim / 2), Review_A)
-        self.review_A = get_features(Review_A.shape[0])
+        self.GNN_A = GCN(rating_dim, Rating_A)
+        self.ReviewGCN_A = ReviewGCN(review_dim, Review_A)
+        self.review_A = get_features(Review_A.shape[0]).to(device)
 
-        self.GNN_B = GCN(int(emb_dim / 2), Rating_B)
-        self.ReviewGCN_B = ReviewGCN(int(emb_dim / 2), Review_B)
-        self.review_B = get_features(Review_B.shape[0])
+        self.GNN_B = GCN(rating_dim, Rating_B)
+        self.ReviewGCN_B = ReviewGCN(review_dim, Review_B)
+        self.review_B = get_features(Review_B.shape[0]).to(device)
 
         self.user_W_Attention_A_A = nn.Parameter(
             torch.randn(Rating_A.shape[0], emb_dim),

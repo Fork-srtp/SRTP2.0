@@ -6,22 +6,22 @@ class MLP(nn.Module):
     def __init__(self, input_dim):
         super().__init__()
         self.fc1 = nn.Linear(input_dim, input_dim * 2)
-        self.act1 = nn.Tanh()
+        self.act1 = nn.ReLU()
 
         self.fc2 = nn.Linear(input_dim * 2, input_dim * 4)
-        self.act2 = nn.Tanh()
+        self.act2 = nn.ReLU()
 
         self.fc3 = nn.Linear(input_dim * 4, input_dim * 8)
-        self.act3 = nn.Tanh()
+        self.act3 = nn.ReLU()
 
         self.fc4 = nn.Linear(input_dim * 8, input_dim * 4)
-        self.act4 = nn.Tanh()
+        self.act4 = nn.ReLU()
 
         self.fc5 = nn.Linear(input_dim * 4, input_dim * 2)
-        self.act5 = nn.Tanh()
+        self.act5 = nn.ReLU()
 
         self.fc6 = nn.Linear(input_dim * 2, input_dim)
-        self.act6 = nn.Tanh()
+        self.act6 = nn.ReLU()
 
     def forward(self, input):
         x = input

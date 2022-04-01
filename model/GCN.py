@@ -10,8 +10,8 @@ class GCN(nn.Module):
 
         self.pre = A
 
-        self.layer1 = GraphConv(A.shape[0], 2 * emb_dim, self.pre, 'relu', dropout=0.5)
-        self.layer2 = GraphConv(2 * emb_dim, emb_dim, self.pre, 'relu', dropout=0.5)
+        self.layer1 = GraphConv(A.shape[0], 2 * emb_dim, self.pre, 'relu', dropout=0.)
+        self.layer2 = GraphConv(2 * emb_dim, emb_dim, self.pre, None, dropout=0.)
 
     def forward(self, features):
         x = self.layer1(features)
