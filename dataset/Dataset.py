@@ -134,3 +134,9 @@ class Dataset(object):
 			user.append(tmp_user)
 			item.append(tmp_item)
 		return [np.array(user), np.array(item)]
+
+	def writeGraph(self, filename):
+		with open(filename, 'w+') as f:
+			for (u, v) in self.graph.edges():
+				f.write(str(u) + " " + str(v) + " " + str(self.graph[u][v]['weight']) + "\n")
+			# print(u, v, self.graph[u][v]['weight'])
